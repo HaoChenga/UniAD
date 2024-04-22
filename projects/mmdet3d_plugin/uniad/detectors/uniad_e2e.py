@@ -12,6 +12,7 @@ import os
 from ..dense_heads.seg_head_plugin import IOU
 from .uniad_track import UniADTrack
 from mmdet.models.builder import build_head
+import pickle
 
 @DETECTORS.register_module()
 class UniAD(UniADTrack):
@@ -315,7 +316,26 @@ class UniAD(UniADTrack):
                 gt_img_is_valid=gt_occ_img_is_valid,
             )
             result[0]['occ'] = outs_occ
-        
+
+
+            #save occ to pkl
+            info_name = img_metas[0]['sample_idx']+ '.pkl'
+            info_path = os.path.join('extra_data/val', info_name)
+            with open(info_path, 'rb') as f:
+                data = pickle.load(f)
+
+            print("occ_outs: ", outs_occ['ins_seg_out'].squeeze().shape)
+            key = 'occupancy'
+            if key in data:
+                data[key].append(outs_occ['ins_seg_out'].squeeze().cpu().numpy())
+            else:
+                data[key] = outs_occ['ins_seg_out'].squeeze().cpu().numpy()
+
+            with open(info_path, 'wb') as f:
+                pickle.dump(data, f)
+            
+            print(f'update {info_name}, adding occupancy.')
+            #breakpoint()
         if self.with_planning_head:
             planning_gt=dict(
                 segmentation=gt_segmentation,

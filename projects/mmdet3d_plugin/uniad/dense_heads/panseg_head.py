@@ -19,6 +19,8 @@ from mmdet.core import (bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh,
                         reduce_mean)
 from mmdet.models.utils import build_transformer
 from .seg_head_plugin import SegDETRHead, IOU
+import os
+import pickle
 
 @HEADS.register_module()
 class PansegformerHead(SegDETRHead):
@@ -1029,6 +1031,11 @@ class PansegformerHead(SegDETRHead):
             lanes_pred = (results[0]['lane'].sum(0) > 0).int()
             lanes_gt = (gt_lane_masks[0][0][:-1].sum(0) > 0).int()
             lanes_iou, lanes_intersection, lanes_union = IOU(lanes_pred.view(1, -1), lanes_gt.view(1, -1))
+            print("drive", drivable_pred.shape)
+            print("lane", lane_pred.shape)
+            panoptic_pred = results[0]['panoptic'][0].transpose(2,0,1)
+            
+            print("panoptic", panoptic_pred.shape)
 
             divider_gt = (gt_lane_masks[0][0][gt_lane_labels[0][0] == 0].sum(0) > 0).int()
             crossing_gt = (gt_lane_masks[0][0][gt_lane_labels[0][0] == 1].sum(0) > 0).int()
@@ -1203,6 +1210,7 @@ class PansegformerHead(SegDETRHead):
                 hw_lvl=hw_lvl)
 
             attn_map = torch.cat([mask_things, mask_stuff], 1)
+
             attn_map = attn_map.squeeze(-1)  # BS, NQ, N_head,LEN
 
             stuff_query = query_inter_stuff[-1]
@@ -1214,7 +1222,7 @@ class PansegformerHead(SegDETRHead):
             mask_pred = F.interpolate(mask_pred.unsqueeze(0),
                                       size=ori_shape[:2],
                                       mode='bilinear').squeeze(0)
-
+            #print("attn_map", mask_pred.shape)
             masks_all = mask_pred
             score_list.append(masks_all)
             drivable_list.append(masks_all[-1] > 0.5)
@@ -1251,7 +1259,7 @@ class PansegformerHead(SegDETRHead):
             labels_st = labels_all[stuff_selected]
             scores_st = scores_all[stuff_selected]
             masks_st = masks_all[stuff_selected]
-            
+            #breakpoint()
             stuff_score_list.append(scores_st)
 
             results = torch.zeros((2, *mask_pred.shape[-2:]),
@@ -1287,6 +1295,7 @@ class PansegformerHead(SegDETRHead):
                     id_unique += 1
 
             file_name = img_metas[img_id]['pts_filename'].split('/')[-1].split('.')[0]
+           
             panoptic_list.append(
                 (results.permute(1, 2, 0).cpu().numpy(), file_name, ori_shape))
 
@@ -1297,6 +1306,23 @@ class PansegformerHead(SegDETRHead):
             lane_score_list.append(lane_score)
         results = []
         for i in range(len(img_metas)):
+            #save info to the pkl
+            info_name = img_metas[i]['sample_idx']+ '.pkl'
+            info_path = os.path.join('extra_data/val', info_name)
+            #transform the dtype to bool
+            #lane_bool = lane_list[i].bool()
+            #breakpoint()
+            with open(info_path, 'wb') as f:
+                pickle.dump(
+                    {
+                    'map':{
+                        'drivable': drivable_list[i].cpu().numpy(),
+                        'lane': lane_list[i].bool().cpu().numpy(),
+                        'lane_score': lane_score_list[i].cpu().numpy(),
+                        'panoptic': panoptic_list[i][0].transpose(2,0,1),  # 2, H, W,
+                          },
+                    }, f)
+            print(f'\n save info to the {info_name} pkl')
             results.append({
                 'bbox': bbox_list[i],
                 'segm': seg_list[i],
