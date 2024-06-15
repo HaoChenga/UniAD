@@ -16,7 +16,7 @@ from mmdet3d.datasets import build_dataset
 from projects.mmdet3d_plugin.datasets.builder import build_dataloader
 from mmdet3d.models import build_model
 from mmdet.apis import set_random_seed
-from projects.mmdet3d_plugin.uniad.apis.test import custom_multi_gpu_test
+from projects.mmdet3d_plugin.uniad.apis.test import custom_multi_gpu_test, custom_multi_gpu_test_carla
 from mmdet.datasets import replace_ImageToTensor
 import time
 import os.path as osp
@@ -188,6 +188,7 @@ def main():
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
+    #breakpoint()
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=samples_per_gpu,
@@ -229,7 +230,7 @@ def main():
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False)
         start = time.time()
-        outputs = custom_multi_gpu_test(model, data_loader, args.tmpdir,
+        outputs = custom_multi_gpu_test_carla(model, data_loader, args.tmpdir,
                                         args.gpu_collect)
         end = time.time()
         print('time:', end - start)

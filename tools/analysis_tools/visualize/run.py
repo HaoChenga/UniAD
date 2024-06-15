@@ -13,6 +13,10 @@ from nuscenes.utils.geometry_utils import view_points, box_in_image, BoxVisibili
 from nuscenes.utils.data_classes import LidarPointCloud, Box
 from nuscenes.utils import splits
 from pyquaternion import Quaternion
+import sys
+
+sys.path.append('/home/penghaocheng/code/UniAD')
+print(sys.path)
 from projects.mmdet3d_plugin.datasets.nuscenes_e2e_dataset import obtain_map_info
 from projects.mmdet3d_plugin.datasets.eval_utils.map_api import NuScenesMap
 from PIL import Image

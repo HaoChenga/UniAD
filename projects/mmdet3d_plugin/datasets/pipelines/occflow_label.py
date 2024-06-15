@@ -79,113 +79,113 @@ class GenerateOccFlowLabels(object):
         # generate segmentation, instance, centerness, offset, and fwd flow map
         """
         # Avoid ignoring obj with index = self.ignore_index
-        SPECIAL_INDEX = -20
+        # SPECIAL_INDEX = -20
 
-        all_gt_bboxes_3d = results['future_gt_bboxes_3d']
-        all_gt_labels_3d = results['future_gt_labels_3d']
-        all_gt_inds = results['future_gt_inds']
-        all_vis_tokens = results['future_gt_vis_tokens']
-        num_frame = len(all_gt_bboxes_3d)
+        # all_gt_bboxes_3d = results['future_gt_bboxes_3d']
+        # all_gt_labels_3d = results['future_gt_labels_3d']
+        # all_gt_inds = results['future_gt_inds']
+        # all_vis_tokens = results['future_gt_vis_tokens']
+        # num_frame = len(all_gt_bboxes_3d)
 
-        # motion related transforms, of seq lengths
-        l2e_r_mats = results['occ_l2e_r_mats']
-        l2e_t_vecs = results['occ_l2e_t_vecs']
-        e2g_r_mats = results['occ_e2g_r_mats']
-        e2g_t_vecs = results['occ_e2g_t_vecs']
+        # # motion related transforms, of seq lengths
+        # l2e_r_mats = results['occ_l2e_r_mats']
+        # l2e_t_vecs = results['occ_l2e_t_vecs']
+        # e2g_r_mats = results['occ_e2g_r_mats']
+        # e2g_t_vecs = results['occ_e2g_t_vecs']
 
-        # reference frame transform
-        t_ref = dict(l2e_r=l2e_r_mats[0], l2e_t=l2e_t_vecs[0], e2g_r=e2g_r_mats[0], e2g_t=e2g_t_vecs[0])
+        # # reference frame transform
+        # t_ref = dict(l2e_r=l2e_r_mats[0], l2e_t=l2e_t_vecs[0], e2g_r=e2g_r_mats[0], e2g_t=e2g_t_vecs[0])
         
-        segmentations = []
-        instances = []
-        gt_future_boxes = []
-        gt_future_labels = []
+        # segmentations = []
+        # instances = []
+        # gt_future_boxes = []
+        # gt_future_labels = []
 
-        # num_frame is 5
-        for i in range(num_frame):
-            # bbox, label, index of curr frame
-            gt_bboxes_3d, gt_labels_3d = all_gt_bboxes_3d[i], all_gt_labels_3d[i]
-            ins_inds = all_gt_inds[i]
-            vis_tokens = all_vis_tokens[i]
+        # # num_frame is 5
+        # for i in range(num_frame):
+        #     # bbox, label, index of curr frame
+        #     gt_bboxes_3d, gt_labels_3d = all_gt_bboxes_3d[i], all_gt_labels_3d[i]
+        #     ins_inds = all_gt_inds[i]
+        #     vis_tokens = all_vis_tokens[i]
             
-            if gt_bboxes_3d is None:
-                # for invalid samples, no loss calculated
-                segmentation = np.ones(
-                    (self.bev_dimension[1], self.bev_dimension[0])) * self.ignore_index
-                instance = np.ones(
-                    (self.bev_dimension[1], self.bev_dimension[0])) * self.ignore_index
-            else:
-                # reframe bboxes to reference frame
-                t_curr = dict(l2e_r=l2e_r_mats[i], l2e_t=l2e_t_vecs[i], e2g_r=e2g_r_mats[i], e2g_t=e2g_t_vecs[i])
-                ref_bboxes_3d = self.reframe_boxes(gt_bboxes_3d, t_ref, t_curr)
-                gt_future_boxes.append(ref_bboxes_3d)
-                gt_future_labels.append(gt_labels_3d)
+        #     if gt_bboxes_3d is None:
+        #         # for invalid samples, no loss calculated
+        #         segmentation = np.ones(
+        #             (self.bev_dimension[1], self.bev_dimension[0])) * self.ignore_index
+        #         instance = np.ones(
+        #             (self.bev_dimension[1], self.bev_dimension[0])) * self.ignore_index
+        #     else:
+        #         # reframe bboxes to reference frame
+        #         t_curr = dict(l2e_r=l2e_r_mats[i], l2e_t=l2e_t_vecs[i], e2g_r=e2g_r_mats[i], e2g_t=e2g_t_vecs[i])
+        #         ref_bboxes_3d = self.reframe_boxes(gt_bboxes_3d, t_ref, t_curr)
+        #         gt_future_boxes.append(ref_bboxes_3d)
+        #         gt_future_labels.append(gt_labels_3d)
 
-                # for valid samples
-                segmentation = np.zeros(
-                    (self.bev_dimension[1], self.bev_dimension[0]))
-                instance = np.zeros(
-                    (self.bev_dimension[1], self.bev_dimension[0]))
+        #         # for valid samples
+        #         segmentation = np.zeros(
+        #             (self.bev_dimension[1], self.bev_dimension[0]))
+        #         instance = np.zeros(
+        #             (self.bev_dimension[1], self.bev_dimension[0]))
 
-                if self.only_vehicle:
-                    vehicle_mask = np.isin(gt_labels_3d, self.filter_cls_ids)
-                    ref_bboxes_3d = ref_bboxes_3d[vehicle_mask]
-                    gt_labels_3d = gt_labels_3d[vehicle_mask]
-                    ins_inds      = ins_inds[vehicle_mask]
-                    if vis_tokens is not None:
-                        vis_tokens = vis_tokens[vehicle_mask]
+        #         if self.only_vehicle:
+        #             vehicle_mask = np.isin(gt_labels_3d, self.filter_cls_ids)
+        #             ref_bboxes_3d = ref_bboxes_3d[vehicle_mask]
+        #             gt_labels_3d = gt_labels_3d[vehicle_mask]
+        #             ins_inds      = ins_inds[vehicle_mask]
+        #             if vis_tokens is not None:
+        #                 vis_tokens = vis_tokens[vehicle_mask]
 
-                if self.filter_invisible:
-                    assert vis_tokens is not None
-                    visible_mask = (vis_tokens != 1)   # obj are filtered out with visibility(1) between 0 and 40% 
-                    ref_bboxes_3d = ref_bboxes_3d[visible_mask]
-                    gt_labels_3d = gt_labels_3d[visible_mask]
-                    ins_inds = ins_inds[visible_mask]
+        #         if self.filter_invisible:
+        #             assert vis_tokens is not None
+        #             visible_mask = (vis_tokens != 1)   # obj are filtered out with visibility(1) between 0 and 40% 
+        #             ref_bboxes_3d = ref_bboxes_3d[visible_mask]
+        #             gt_labels_3d = gt_labels_3d[visible_mask]
+        #             ins_inds = ins_inds[visible_mask]
 
-                # valid sample and has objects
-                if len(ref_bboxes_3d.tensor) > 0:                    
-                    bbox_corners = ref_bboxes_3d.corners[:, [
-                        0, 3, 7, 4], :2].numpy()
-                    bbox_corners = np.round(
-                        (bbox_corners - self.bev_start_position[:2] + self.bev_resolution[:2] / 2.0) / self.bev_resolution[:2]).astype(np.int32)
+        #         # valid sample and has objects
+        #         if len(ref_bboxes_3d.tensor) > 0:                    
+        #             bbox_corners = ref_bboxes_3d.corners[:, [
+        #                 0, 3, 7, 4], :2].numpy()
+        #             bbox_corners = np.round(
+        #                 (bbox_corners - self.bev_start_position[:2] + self.bev_resolution[:2] / 2.0) / self.bev_resolution[:2]).astype(np.int32)
 
-                    for index, gt_ind in enumerate(ins_inds):
-                        if gt_ind == self.ignore_index:
-                            gt_ind = SPECIAL_INDEX   # 255 -> -20
-                        poly_region = bbox_corners[index]
+        #             for index, gt_ind in enumerate(ins_inds):
+        #                 if gt_ind == self.ignore_index:
+        #                     gt_ind = SPECIAL_INDEX   # 255 -> -20
+        #                 poly_region = bbox_corners[index]
 
-                        cv2.fillPoly(segmentation, [poly_region], 1.0)
-                        cv2.fillPoly(instance, [poly_region], int(gt_ind))
+        #                 cv2.fillPoly(segmentation, [poly_region], 1.0)
+        #                 cv2.fillPoly(instance, [poly_region], int(gt_ind))
 
-            segmentations.append(segmentation)
-            instances.append(instance)
+        #     segmentations.append(segmentation)
+        #     instances.append(instance)
 
-        # segmentation = 1 where objects are located
-        segmentations = torch.from_numpy(
-            np.stack(segmentations, axis=0)).long()
-        instances = torch.from_numpy(np.stack(instances, axis=0)).long()
+        # # segmentation = 1 where objects are located
+        # segmentations = torch.from_numpy(
+        #     np.stack(segmentations, axis=0)).long()
+        # instances = torch.from_numpy(np.stack(instances, axis=0)).long()
 
-        # generate heatmap & offset from segmentation & instance
-        instance_centerness, instance_offset, instance_flow, instance_backward_flow = self.center_offset_flow(
-            instances, 
-            all_gt_inds, 
-            ignore_index=255,
-            )
+        # # generate heatmap & offset from segmentation & instance
+        # instance_centerness, instance_offset, instance_flow, instance_backward_flow = self.center_offset_flow(
+        #     instances, 
+        #     all_gt_inds, 
+        #     ignore_index=255,
+        #     )
 
-        invalid_mask = (segmentations[:, 0, 0] == self.ignore_index)
-        instance_centerness[invalid_mask] = self.ignore_index
+        # invalid_mask = (segmentations[:, 0, 0] == self.ignore_index)
+        # instance_centerness[invalid_mask] = self.ignore_index
 
         results['gt_occ_has_invalid_frame'] = results.pop('occ_has_invalid_frame')
         results['gt_occ_img_is_valid'] = results.pop('occ_img_is_valid')
         results.update({
-            'gt_segmentation': segmentations,
-            'gt_instance': instances,
-            'gt_centerness': instance_centerness,
-            'gt_offset': instance_offset,
-            'gt_flow': instance_flow,
-            'gt_backward_flow': instance_backward_flow,
-            'gt_future_boxes': gt_future_boxes,
-            'gt_future_labels': gt_future_labels
+            'gt_segmentation': [],
+            'gt_instance': [],
+            'gt_centerness': [],
+            'gt_offset': [],
+            'gt_flow': [],
+            'gt_backward_flow': [],
+            'gt_future_boxes': [],
+            'gt_future_labels': []
         })
         return results
 

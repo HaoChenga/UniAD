@@ -414,15 +414,17 @@ class OccHead(BaseModule):
                     gt_instance=None,
                     gt_img_is_valid=None,
                 ):
-        gt_segmentation, gt_instance, gt_img_is_valid = self.get_occ_labels(gt_segmentation, gt_instance, gt_img_is_valid)
+        #gt_segmentation, gt_instance, gt_img_is_valid = self.get_occ_labels(gt_segmentation, gt_instance, gt_img_is_valid)
 
         out_dict = dict()
-        out_dict['seg_gt']  = gt_segmentation[:, :1+self.n_future]  # [1, 5, 1, 200, 200]
-        out_dict['ins_seg_gt'] = self.get_ins_seg_gt(gt_instance[:, :1+self.n_future])  # [1, 5, 200, 200]
+        #out_dict['seg_gt']  = gt_segmentation[:, :1+self.n_future]  # [1, 5, 1, 200, 200]
+        #out_dict['ins_seg_gt'] = self.get_ins_seg_gt(gt_instance[:, :1+self.n_future])  # [1, 5, 200, 200]
         if no_query:
             # output all zero results
-            out_dict['seg_out'] = torch.zeros_like(out_dict['seg_gt']).long()  # [1, 5, 1, 200, 200]
-            out_dict['ins_seg_out'] = torch.zeros_like(out_dict['ins_seg_gt']).long()  # [1, 5, 200, 200]
+            # out_dict['seg_out'] = torch.zeros_like(out_dict['seg_gt']).long()  # [1, 5, 1, 200, 200]
+            # out_dict['ins_seg_out'] = torch.zeros_like(out_dict['ins_seg_gt']).long()  # [1, 5, 200, 200]
+            out_dict['seg_out'] = torch.zeros(1, 1+self.n_future, 1, *self.bev_size).long().to(bev_feat.device)
+            out_dict['ins_seg_out'] = torch.zeros(1, 1+self.n_future, *self.bev_size).long().to(bev_feat.device)
             return out_dict
 
         ins_query = self.merge_queries(outs_dict, self.detach_query_pos)
@@ -473,4 +475,6 @@ class OccHead(BaseModule):
         gt_segmentation = gt_segmentation[:, :self.n_future+1].long().unsqueeze(2)
         gt_instance = gt_instance[:, :self.n_future+1].long()
         gt_img_is_valid = gt_img_is_valid[:, :self.receptive_field + self.n_future]
-        return gt_segmentation, gt_instance, gt_img_is_valid
+        return [], [], []
+        #for carla dataset, we don't need to return gt_segmentation, gt_instance, gt_img_is_valid
+        #return gt_segmentation, gt_instance, gt_img_is_valid

@@ -93,6 +93,43 @@ def output_to_nusc_box_det(detection):
         box_list.append(box)
     return box_list
 
+#TODO:should check this function
+def lidar_carla_box_to_global(info,
+                             boxes,
+                             classes,
+                             eval_configs,
+                             eval_version='detection_cvpr_2019'):
+    """Convert the box from ego to global coordinate.
+    Args:
+        info (dict): Info for a specific sample data, including the
+            calibration information.
+        boxes (list[:obj:`NuScenesBox`]): List of predicted NuScenesBoxes.
+        classes (list[str]): Mapped classes in the evaluation.
+        eval_configs (object): Evaluation configuration object.
+        eval_version (str, optional): Evaluation version.
+            Default: 'detection_cvpr_2019'
+    Returns:
+        list: List of standard NuScenesBoxes in the global
+            coordinate.
+    """
+    box_list = []
+    keep_idx = []
+    for i, box in enumerate(boxes):
+        # Move box to ego vehicle coord system
+        box.rotate(Quaternion(info['rotation']))
+        box.translate(np.array(info['translation']))
+        # filter det in ego.
+        cls_range_map = eval_configs.class_range
+        radius = np.linalg.norm(box.center[:2], 2)
+        det_range = cls_range_map[classes[box.label]]
+        if radius > det_range:
+            continue
+        # Move box to global coord system
+        #box.rotate(Quaternion(info['ego2global_rotation']))
+        #box.translate(np.array(info['ego2global_translation']))
+        box_list.append(box)
+        keep_idx.append(i)
+    return box_list, keep_idx
 
 def lidar_nusc_box_to_global(info,
                              boxes,

@@ -399,7 +399,7 @@ class UniADTrack(MVXTwoStageDetector):
         output_past_trajs = det_output["all_past_traj_preds"]
         last_ref_pts = det_output["last_ref_points"]
         query_feats = det_output["query_feats"]
-
+        print("output_past_trajs", output_past_trajs)
         out = {
             "pred_logits": output_classes[-1],
             "pred_boxes": output_coords[-1],
@@ -672,6 +672,7 @@ class UniADTrack(MVXTwoStageDetector):
             "all_past_traj_preds": det_output["all_past_traj_preds"],
             "bev_pos": bev_pos,
         }
+        #print("all_past_traj_preds", det_output["all_past_traj_preds"].shape)
 
         """ update track instances with predict results """
         track_scores = output_classes[-1, 0, :].sigmoid().max(dim=-1).values
@@ -770,6 +771,16 @@ class UniADTrack(MVXTwoStageDetector):
             get_keys += ["sdc_boxes_3d", "sdc_scores_3d", "sdc_track_scores", "sdc_track_bbox_results", "sdc_embedding"]
         results[0].update({k: frame_res[k] for k in get_keys})
         results = self._det_instances2results(track_instances_fordet, results, img_metas)
+
+        # det_output = self.pts_bbox_head.get_detections(
+        #     self.prev_bev, 
+        #     object_query_embeds=track_instances.query,
+        #     ref_points=track_instances.ref_pts,
+        #     img_metas=img_metas,
+        # )
+        # print("det_output: ", det_output['all_past_traj_preds'])   
+
+
         return results
     
     def _track_instances2results(self, track_instances, img_metas, with_mask=True):
@@ -779,6 +790,7 @@ class UniADTrack(MVXTwoStageDetector):
             track_scores=track_instances.scores,
             obj_idxes=track_instances.obj_idxes,
         )
+        breakpoint()
         # bboxes_dict = self.bbox_coder.decode(bbox_dict, with_mask=with_mask)[0]
         bboxes_dict = self.bbox_coder.decode(bbox_dict, with_mask=with_mask, img_metas=img_metas)[0]
         bboxes = bboxes_dict["bboxes"]

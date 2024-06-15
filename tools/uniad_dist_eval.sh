@@ -22,7 +22,7 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python -m torch.distributed.launch \
     --nproc_per_node=$GPUS_PER_NODE \
     --master_port=$MASTER_PORT \
-    $(dirname "$0")/test.py \
+    $(dirname "$0")/test_carla.py \
     $CFG \
     $CKPT \
     --launcher pytorch ${@:4} \

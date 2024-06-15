@@ -23,6 +23,9 @@ import tempfile
 from mmcv.parallel import DataContainer as DC
 import random
 import pickle
+import os
+from scipy.spatial.transform import Rotation as R
+
 from prettytable import PrettyTable
 
 from nuscenes import NuScenes
@@ -30,8 +33,11 @@ from projects.mmdet3d_plugin.datasets.data_utils.vector_map import VectorizedLoc
 from projects.mmdet3d_plugin.datasets.data_utils.rasterize import preprocess_map
 from projects.mmdet3d_plugin.datasets.eval_utils.map_api import NuScenesMap
 from projects.mmdet3d_plugin.datasets.data_utils.trajectory_api import NuScenesTraj
-from .data_utils.data_utils import lidar_nusc_box_to_global, obtain_map_info, output_to_nusc_box, output_to_nusc_box_det
+from .data_utils.data_utils import lidar_nusc_box_to_global, obtain_map_info, output_to_nusc_box, output_to_nusc_box_det, lidar_carla_box_to_global
 from nuscenes.prediction import convert_local_coords_to_global
+
+import json
+
 
 
 @DATASETS.register_module()
@@ -250,8 +256,11 @@ class NuScenesE2EDataset(NuScenesDataset):
         """
 
         input_dict = self.get_data_info(index)
+        #breakpoint()
+        #print("input_dict", input_dict)
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
+        #breakpoint()
         data_dict = {}
         for key, value in example.items():
             if 'l2g' in key:
@@ -264,6 +273,7 @@ class NuScenesE2EDataset(NuScenesDataset):
         """
         convert sample dict into one single sample.
         """
+        breakpoint()
         imgs_list = [each['img'].data for each in queue]
         gt_labels_3d_list = [each['gt_labels_3d'].data for each in queue]
         gt_sdc_label_list = [each['gt_sdc_label'].data for each in queue]
@@ -480,15 +490,15 @@ class NuScenesE2EDataset(NuScenesDataset):
         # standard protocal modified from SECOND.Pytorch
         input_dict = dict(
             sample_idx=info['token'],
-            pts_filename=info['lidar_path'],
-            sweeps=info['sweeps'],
+            #pts_filename=info['lidar_path'],
+            #sweeps=info['sweeps'],
             ego2global_translation=info['ego2global_translation'],
             ego2global_rotation=info['ego2global_rotation'],
-            prev_idx=info['prev'],
-            next_idx=info['next'],
+            #prev_idx=info['prev'],
+            #next_idx=info['next'],
             scene_token=info['scene_token'],
             can_bus=info['can_bus'],
-            frame_idx=info['frame_idx'],
+            #frame_idx=info['frame_idx'],
             timestamp=info['timestamp'] / 1e6,
             map_filename=lane_info['maps']['map_mask'] if lane_info else None,
             gt_lane_labels=gt_labels,
@@ -519,6 +529,7 @@ class NuScenesE2EDataset(NuScenesDataset):
             for cam_type, cam_info in info['cams'].items():
                 image_paths.append(cam_info['data_path'])
                 # obtain lidar to image transformation matrix
+                #breakpoint()
                 lidar2cam_r = np.linalg.inv(cam_info['sensor2lidar_rotation'])
                 lidar2cam_t = cam_info[
                     'sensor2lidar_translation'] @ lidar2cam_r.T
@@ -555,6 +566,7 @@ class NuScenesE2EDataset(NuScenesDataset):
         can_bus = input_dict['can_bus']
         can_bus[:3] = translation
         can_bus[3:7] = rotation
+        #breakpoint()
         patch_angle = quaternion_yaw(rotation) / np.pi * 180
         if patch_angle < 0:
             patch_angle += 360
@@ -587,6 +599,7 @@ class NuScenesE2EDataset(NuScenesDataset):
         # generate detection labels for current + future frames
         input_dict['occ_future_ann_infos'] = \
             self.get_future_detection_infos(future_frames)
+        #breakpoint()
         return input_dict
 
     def get_future_detection_infos(self, future_frames):
@@ -750,25 +763,39 @@ class NuScenesE2EDataset(NuScenesDataset):
         for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
             annos = []
             sample_token = self.data_infos[sample_id]['token']
-
+            #breakpoint()
             if 'map' in self.eval_mod:
-                map_annos = {}
-                for key, value in det['ret_iou'].items():
-                    map_annos[key] = float(value.numpy()[0])
-                    nusc_map_annos[sample_token] = map_annos
+                #for carla
+                pass
+                # map_annos = {}
+                # for key, value in det['ret_iou'].items():
+                #     map_annos[key] = float(value.numpy()[0])
+                #     nusc_map_annos[sample_token] = map_annos
 
             if 'boxes_3d' not in det:
                 nusc_annos[sample_token] = annos
                 continue
 
             boxes = output_to_nusc_box(det)
+            #breakpoint()
             boxes_ego = copy.deepcopy(boxes)
+            
             boxes, keep_idx = lidar_nusc_box_to_global(self.data_infos[sample_id], boxes,
                                                        mapped_class_names,
                                                        self.eval_detection_configs,
                                                        self.eval_version)
+            #save objects(bboxes) to the pkl
+            info_name = sample_token+ '.pkl'
+            info_path = os.path.join('extra_data/val', info_name)
+            with open(info_path, 'rb') as f:
+                info_nobbox = pickle.load(f)
+            
+            info_nobbox['objects'] = []
+            
             for i, box in enumerate(boxes):
+                breakpoint()
                 name = mapped_class_names[box.label]
+                #breakpoint()
                 if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:
                     if name in [
                             'car',
@@ -799,6 +826,7 @@ class NuScenesE2EDataset(NuScenesDataset):
 
                 box_ego = boxes_ego[keep_idx[i]]
                 trans = box_ego.center
+
                 if 'traj' in det:
                     traj_local = det['traj'][keep_idx[i]].numpy()[..., :2]
                     traj_scores = det['traj_scores'][keep_idx[i]].numpy()
@@ -810,7 +838,7 @@ class NuScenesE2EDataset(NuScenesDataset):
                 for kk in range(traj_ego.shape[0]):
                     traj_ego[kk] = convert_local_coords_to_global(
                         traj_local[kk], trans, rot)
-
+                #print("tra 0", traj_ego[0])
                 nusc_anno = dict(
                     sample_token=sample_token,
                     translation=box.center.tolist(),
@@ -827,7 +855,33 @@ class NuScenesE2EDataset(NuScenesDataset):
                     predict_traj_score=traj_scores,
                 )
                 annos.append(nusc_anno)
+                                
+                #align the result with ad
+                score_index = traj_scores.argmax()
+                traj_best = traj_ego[score_index]
+
+                quat = box.orientation.elements.tolist()
+                r = R.from_quat(quat)
+                rot = r.as_euler('xyz', degrees=False)
+
+                save_bbox = np.array(box_ego.center.tolist() + box.wlh.tolist() + rot.tolist())
+
+                #breakpoint()
+                info = {
+                    'name':name,
+                    'bbox':save_bbox,
+                    'traj': traj_best,
+                    'id': i,
+                }
+                info_nobbox['objects'].append(info)
+
+
             nusc_annos[sample_token] = annos
+            #save the bbox to the pkl
+            with open(info_path, 'wb') as f:
+                pickle.dump(info_nobbox, f)
+            print(f"update objects to {info_name}")
+        print(f'\n <<<<<<<<<<<<< update finsihed, total {sample_id+1} samples <<<<<<<<<<<<<')
         nusc_submissions = {
             'meta': self.modality,
             'results': nusc_annos,
@@ -839,7 +893,164 @@ class NuScenesE2EDataset(NuScenesDataset):
         print('Results writes to', res_path)
         mmcv.dump(nusc_submissions, res_path)
         return res_path
+    
 
+    def _format_bbox_carla(self, results, jsonfile_prefix=None):
+        """Convert the results to the standard format.
+        Args:
+            results (list[dict]): Testing results of the dataset.
+            jsonfile_prefix (str): The prefix of the output jsonfile.
+                You can specify the output directory/filename by
+                modifying the jsonfile_prefix. Default: None.
+        Returns:
+            str: Path of the output json file.
+        """
+        nusc_annos = {}
+        nusc_map_annos = {}
+        mapped_class_names = self.CLASSES
+
+        with open('data/06122152_1agent_res1600x928/39/ego_pose_0039.json') as f:
+            ego_pose = json.load(f)
+
+        print('Start to convert detection format...')
+        for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
+            annos = []
+            sample_token = sample_id
+            #sample_token = self.data_infos[sample_id]['token']
+            #breakpoint()
+            if 'map' in self.eval_mod:
+                #for carla
+                pass
+                # map_annos = {}
+                # for key, value in det['ret_iou'].items():
+                #     map_annos[key] = float(value.numpy()[0])
+                #     nusc_map_annos[sample_token] = map_annos
+
+            if 'boxes_3d' not in det:
+                nusc_annos[sample_token] = annos
+                continue
+            #breakpoint()
+            # if det['boxes_3d'] is not None:
+            #     breakpoint()
+            boxes = output_to_nusc_box_det(det)
+            
+            #breakpoint()
+            boxes_ego = copy.deepcopy(boxes)
+            
+            boxes, keep_idx = lidar_carla_box_to_global(ego_pose[sample_id], boxes,
+                                                       mapped_class_names,
+                                                       self.eval_detection_configs,
+                                                       self.eval_version)
+            #save objects(bboxes) to the pkl
+            info_name = str(sample_id)+ '.pkl'
+            info_path = os.path.join('extra_data/val', info_name)
+            with open(info_path, 'rb') as f:
+                info_nobbox = pickle.load(f)
+            
+            info_nobbox['objects'] = []
+            
+            for i, box in enumerate(boxes):
+                breakpoint()
+                name = mapped_class_names[box.label]
+                #breakpoint()
+                if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:
+                    if name in [
+                            'car',
+                            'construction_vehicle',
+                            'bus',
+                            'truck',
+                            'trailer',
+                    ]:
+                        attr = 'vehicle.moving'
+                    elif name in ['bicycle', 'motorcycle']:
+                        attr = 'cycle.with_rider'
+                    else:
+                        attr = NuScenesDataset.DefaultAttribute[name]
+                else:
+                    if name in ['pedestrian']:
+                        attr = 'pedestrian.standing'
+                    elif name in ['bus']:
+                        attr = 'vehicle.stopped'
+                    else:
+                        attr = NuScenesDataset.DefaultAttribute[name]
+
+                # center_ = box.center.tolist()
+                # change from ground height to center height
+                # center_[2] = center_[2] + (box.wlh.tolist()[2] / 2.0)
+                if name not in ['car', 'truck', 'bus', 'trailer', 'motorcycle',
+                                'bicycle', 'pedestrian', ]:
+                    continue
+
+                box_ego = boxes_ego[keep_idx[i]]
+                trans = box_ego.center
+
+                if 'traj' in det:
+                    traj_local = det['traj'][keep_idx[i]].numpy()[..., :2]
+                    traj_scores = det['traj_scores'][keep_idx[i]].numpy()
+                else:
+                    traj_local = np.zeros((0,))
+                    traj_scores = np.zeros((0,))
+                traj_ego = np.zeros_like(traj_local)
+                rot = Quaternion(axis=np.array([0, 0.0, 1.0]), angle=np.pi/2)
+                for kk in range(traj_ego.shape[0]):
+                    #TODO: should check
+                    traj_ego[kk] = convert_local_coords_to_global(
+                        traj_local[kk], trans, rot)
+                #print("tra 0", traj_ego[0])
+                nusc_anno = dict(
+                    sample_token=sample_token,
+                    translation=box.center.tolist(),
+                    size=box.wlh.tolist(),
+                    rotation=box.orientation.elements.tolist(),
+                    velocity=box.velocity[:2].tolist(),
+                    detection_name=name,
+                    detection_score=box.score,
+                    attribute_name=attr,
+                    tracking_name=name,
+                    tracking_score=box.score,
+                    tracking_id=box.token,
+                    predict_traj=traj_ego,
+                    predict_traj_score=traj_scores,
+                )
+                annos.append(nusc_anno)
+                                
+                #align the result with ad
+                score_index = traj_scores.argmax()
+                traj_best = traj_ego[score_index]
+
+                quat = box.orientation.elements.tolist()
+                r = R.from_quat(quat)
+                rot = r.as_euler('xyz', degrees=False)
+
+                save_bbox = np.array(box_ego.center.tolist() + box.wlh.tolist() + rot.tolist())
+
+                #breakpoint()
+                info = {
+                    'name':name,
+                    'bbox':save_bbox,
+                    'traj': traj_best,
+                    'id': i,
+                }
+                info_nobbox['objects'].append(info)
+
+
+            nusc_annos[sample_token] = annos
+            #save the bbox to the pkl
+            with open(info_path, 'wb') as f:
+                pickle.dump(info_nobbox, f)
+            print(f"update objects to {info_name}")
+        print(f'\n <<<<<<<<<<<<< update finsihed, total {sample_id+1} samples <<<<<<<<<<<<<')
+        nusc_submissions = {
+            'meta': self.modality,
+            'results': nusc_annos,
+            'map_results': nusc_map_annos,
+        }
+
+        mmcv.mkdir_or_exist(jsonfile_prefix)
+        res_path = osp.join(jsonfile_prefix, 'results_nusc.json')
+        print('Results writes to', res_path)
+        mmcv.dump(nusc_submissions, res_path)
+        return res_path
     def format_results(self, results, jsonfile_prefix=None):
         """Format the results to json (standard format for COCO evaluation).
 
@@ -856,9 +1067,9 @@ class NuScenesE2EDataset(NuScenesDataset):
                 `jsonfile_prefix` is not specified.
         """
         assert isinstance(results, list), 'results must be a list'
-        assert len(results) == len(self), (
-            'The length of results is not equal to the dataset len: {} != {}'.
-            format(len(results), len(self)))
+        # assert len(results) == len(self), (
+        #     'The length of results is not equal to the dataset len: {} != {}'.
+        #     format(len(results), len(self)))
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -866,7 +1077,9 @@ class NuScenesE2EDataset(NuScenesDataset):
         else:
             tmp_dir = None
 
-        result_files = self._format_bbox(results, jsonfile_prefix)
+        #modify for carla
+        #result_files = self._format_bbox(results, jsonfile_prefix)
+        result_files = self._format_bbox_carla(results, jsonfile_prefix)
 
         return result_files, tmp_dir
 
@@ -960,9 +1173,9 @@ class NuScenesE2EDataset(NuScenesDataset):
                 `jsonfile_prefix` is not specified.
         """
         assert isinstance(results, list), 'results must be a list'
-        assert len(results) == len(self), (
-            'The length of results is not equal to the dataset len: {} != {}'.
-            format(len(results), len(self)))
+        # assert len(results) == len(self), (
+        #     'The length of results is not equal to the dataset len: {} != {}'.
+        #     format(len(results), len(self)))
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -1159,6 +1372,7 @@ class NuScenesE2EDataset(NuScenesDataset):
 
         if 'track' in self.eval_mod:
             cfg = config_factory("tracking_nips_2019")
+            print("version: ", self.version)
             self.nusc_eval_track = TrackingEval(
                 config=cfg,
                 result_path=result_path,
