@@ -261,11 +261,11 @@ def custom_multi_gpu_test_carla(model, data_loader, tmpdir=None, gpu_collect=Fal
     datas_all = []
 
 
-    canbus_path = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900/39/0039_pose.json'
-    ego_pose_path = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900/39/ego_pose_0039.json'
-    calibration_sensor_path = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900/calibration_sensor.json'
-    command_and_time_path = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900/39/0039_command.json'
-    cam_data_path = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900/39'
+    canbus_path = 'data/carla-gen_data-1agent-20242303/39/0039_pose.json'
+    ego_pose_path = 'data/carla-gen_data-1agent-20242303/39/ego_pose_0039.json'
+    calibration_sensor_path = 'data/carla-gen_data-1agent-20242303/calibration_sensor.json'
+    command_and_time_path = 'data/carla-gen_data-1agent-20242303/39/0039_command.json'
+    cam_data_path = 'data/carla-gen_data-1agent-20242303/39'
     #read json file
     with open(canbus_path) as f:
         canbus_datas = json.load(f)
@@ -393,7 +393,7 @@ def custom_multi_gpu_test_carla(model, data_loader, tmpdir=None, gpu_collect=Fal
         lidar2img = data['img_metas'][0].data[0][0]['lidar2img'].copy()
         data['img_metas'][0].data[0] = datas_all[i]['img_metas'][0].data[0]
         
-        data['img_metas'][0].data[0][0]['lidar2img'] = lidar2img
+        #data['img_metas'][0].data[0][0]['lidar2img'] = lidar2img
         #breakpoint()
         #data = datas_all[i]
         #data['img_metas'][0].data[0][0]['can_bus'] = datas_all[i]['img_metas'][0].data[0][0]['can_bus']

@@ -47,13 +47,13 @@ def _get_can_bus_info(canbus_data):
 
 
 def get_global_sensor_pose(ego2global, lidar2ego, inverse=False):
-    lidar2ego_rt = lidar2ego['lidar2local']
+    lidar2ego_rt = lidar2ego['lidar2ego']
     ego2global_rt = transform_matrix(ego2global['translation'], Quaternion(ego2global['rotation']), inverse=inverse)
 
     if inverse:
         return np.dot(lidar2ego_rt, ego2global_rt) #TODO:should check the order
     else:
-        return np.dot(ego2global_rt.inv(), lidar2ego_rt.inv())
+        return np.dot(np.linalg.inv(ego2global_rt), np.linalg.inv(lidar2ego_rt))
 
 
 
@@ -62,7 +62,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
     lidar2ego_path = os.path.join(carla_dir, 'lidar2local.json')
     #calibration_path = os.path.join(carla_dir, scene_name, 'calibration.json')
-    ego_pose_path = os.path.join(carla_dir, scene_name, 'ego_pose.json')
+    ego_pose_path = os.path.join(carla_dir, scene_name, 'ego_pose_0039.json')
     canbus_path = os.path.join(carla_dir, scene_name, '0039_pose.json')
 
     steer_path = os.path.join(carla_dir, scene_name, '0039_steer_angle_feedback.json')
@@ -75,6 +75,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
     with open(lidar2ego_path) as f:
         lidar2ego_data = json.load(f)
+        lidar2ego = np.array(lidar2ego_data['lidar2ego'])
 
     with open(steer_path) as f:
         steer_datas = json.load(f)
@@ -84,7 +85,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
         ego_his_trajs = np.zeros((his_ts+1, 3))
         ego_his_trajs_diff = np.zeros((his_ts+1, 3))  
-        sample_cur = frame_id\
+        sample_cur = frame_id
         
         # get the history trajectory of the ego vehicle in the gloabl coordinatre
         for i in range(his_ts, -1, -1):
@@ -116,8 +117,9 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
         rot_mat = Quaternion(ego_pose_datas[frame_id]['rotation']).inverse.rotation_matrix
         ego_his_trajs = np.dot(rot_mat, ego_his_trajs.T).T
         # ego to lidar at lcf
-        ego_his_trajs = ego_his_trajs - lidar2ego_data[:3,3]
-        rot_mat = lidar2ego_data[:3,:3].T
+        #breakpoint()
+        ego_his_trajs = ego_his_trajs - lidar2ego[:3,3]
+        rot_mat = lidar2ego[:3,:3].T
         ego_his_trajs = np.dot(rot_mat, ego_his_trajs.T).T
         ego_his_diff = ego_his_trajs[1:] - ego_his_trajs[:-1]
     
@@ -143,8 +145,8 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
         rot_mat = Quaternion(ego_pose_datas[frame_id]['rotation']).inverse.rotation_matrix
         ego_fut_trajs = np.dot(rot_mat, ego_fut_trajs.T).T
         # ego to lidar at lcf
-        ego_fut_trajs = ego_fut_trajs - lidar2ego_data[:3,3]
-        rot_mat = lidar2ego_data[:3,:3].T
+        ego_fut_trajs = ego_fut_trajs - lidar2ego[:3,3]
+        rot_mat = lidar2ego[:3,:3].T
         ego_fut_trajs = np.dot(rot_mat, ego_fut_trajs.T).T
 
         if ego_fut_trajs[-1][0] >= 2:
@@ -174,9 +176,9 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
             _, _, ego_yaw_next = quart_to_rpy(ego_pose_datas[next_frame_id]['rotation'])
             ego_pos_next = np.array(ego_pose_datas[next_frame_id]['translation'])
 
-        assert (pose_record_prev is not None) or (pose_record_next is not None), 'prev token and next token all empty'
+        assert (pose_record_prev ) or (pose_record_next ), 'prev token and next token all empty'
         
-        if pose_record_prev is not None:
+        if pose_record_prev:
             ego_w = (ego_yaw - ego_yaw_prev) / 0.5
             ego_v = np.linalg.norm(ego_pos[:2] - ego_pos_prev[:2]) / 0.5
             ego_vx, ego_vy = ego_v * math.cos(ego_yaw + np.pi/2), ego_v * math.sin(ego_yaw + np.pi/2)
@@ -186,7 +188,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
             ego_vx, ego_vy = ego_v * math.cos(ego_yaw + np.pi/2), ego_v * math.sin(ego_yaw + np.pi/2)
 
         try:
-            v0 = canbus_data['vel']
+            v0 = canbus_data['vel'][0]
             steering = steer_datas[frame_id]['value']
             Kappa = 2 * steering / 2.588 #TODO: check the steering ratio
         
@@ -234,7 +236,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
 if __name__ == "__main__":
    
-   carla_dir = 'data/carla-gen_data-06142258_1agent_res1600x900/06142258_1agent_res1600x900'
+   carla_dir = 'data/carla-gen_data-1agent-20242303'
    scene_name = '39'
-   
+
    fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6)
