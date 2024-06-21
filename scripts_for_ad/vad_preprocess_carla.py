@@ -60,12 +60,12 @@ def get_global_sensor_pose(ego2global, lidar2ego, inverse=False):
 def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
 
-    lidar2ego_path = os.path.join(carla_dir, 'lidar2local.json')
+    lidar2ego_path = os.path.join(carla_dir, scene_name, 'lidar2local.json')
     #calibration_path = os.path.join(carla_dir, scene_name, 'calibration.json')
-    ego_pose_path = os.path.join(carla_dir, scene_name, 'ego_pose_0039.json')
-    canbus_path = os.path.join(carla_dir, scene_name, '0039_pose.json')
+    ego_pose_path = os.path.join(carla_dir, scene_name, 'ego_pose.json')
+    canbus_path = os.path.join(carla_dir, scene_name, 'pose.json')
 
-    steer_path = os.path.join(carla_dir, scene_name, '0039_steer_angle_feedback.json')
+    steer_path = os.path.join(carla_dir, scene_name, 'steer_angle_feedback.json')
 
     with open(canbus_path) as f:
         canbus_datas = json.load(f)
@@ -79,7 +79,10 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
     with open(steer_path) as f:
         steer_datas = json.load(f)
-    
+
+    assert len(canbus_datas) == len(ego_pose_datas), 'canbus and ego pose data length not equal.'
+    print(f'update {len(ego_pose_datas)} samples, start to add ego state and hist/fut traj/traj_diff .')
+
     for frame_id, canbus_data in enumerate(canbus_datas):
 
 
@@ -134,7 +137,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
             ego_fut_masks[i] = 1
 
             next = sample_cur + 1
-            if next>len(ego_pose_datas):
+            if next>=len(ego_pose_datas):
                     ego_fut_trajs[i+1:] = ego_fut_trajs[i]
                     break
             else:
@@ -236,7 +239,7 @@ def fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6):
 
 if __name__ == "__main__":
    
-   carla_dir = 'data/carla-gen_data-1agent-20242303'
-   scene_name = '39'
+   carla_dir = 'data/06202142-3_agent'
+   scene_name = '55'
 
    fill_carla_infos(carla_dir, scene_name, his_ts=4, fut_ts=6)

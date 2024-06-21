@@ -932,7 +932,7 @@ class NuScenesE2EDataset(NuScenesDataset):
             #breakpoint()
             # if det['boxes_3d'] is not None:
             #     breakpoint()
-            boxes = output_to_nusc_box_det(det)
+            boxes = output_to_nusc_box(det)
             
             #breakpoint()
             boxes_ego = copy.deepcopy(boxes)
@@ -942,6 +942,8 @@ class NuScenesE2EDataset(NuScenesDataset):
                                                        self.eval_detection_configs,
                                                        self.eval_version)
             #save objects(bboxes) to the pkl
+            if len(boxes) > 0:
+                print(f'\n <<<<<<<<<<<<<  {sample_id} detection work <<<<<<<<<<<<<')
             info_name = str(sample_id)+ '.pkl'
             info_path = os.path.join('extra_data/val', info_name)
             with open(info_path, 'rb') as f:
@@ -950,7 +952,7 @@ class NuScenesE2EDataset(NuScenesDataset):
             info_nobbox['objects'] = []
             
             for i, box in enumerate(boxes):
-                breakpoint()
+                #breakpoint()
                 name = mapped_class_names[box.label]
                 #breakpoint()
                 if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:

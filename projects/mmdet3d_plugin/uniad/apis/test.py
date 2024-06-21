@@ -260,12 +260,13 @@ def custom_multi_gpu_test_carla(model, data_loader, tmpdir=None, gpu_collect=Fal
     data_format = data_loader.dataset[0]
     datas_all = []
 
+    base_dir = 'data/06202142-3_agent/55'
 
-    canbus_path = 'data/carla-gen_data-1agent-20242303/39/0039_pose.json'
-    ego_pose_path = 'data/carla-gen_data-1agent-20242303/39/ego_pose_0039.json'
-    calibration_sensor_path = 'data/carla-gen_data-1agent-20242303/calibration_sensor.json'
-    command_and_time_path = 'data/carla-gen_data-1agent-20242303/39/0039_command.json'
-    cam_data_path = 'data/carla-gen_data-1agent-20242303/39'
+    canbus_path = os.path.join(base_dir, 'pose.json')  
+    ego_pose_path = os.path.join(base_dir, 'ego_pose.json')
+    calibration_sensor_path = os.path.join(base_dir, 'calibration_sensor.json')
+    command_and_time_path = os.path.join(base_dir, 'command.json')
+    cam_data_path = base_dir
     #read json file
     with open(canbus_path) as f:
         canbus_datas = json.load(f)
@@ -406,7 +407,7 @@ def custom_multi_gpu_test_carla(model, data_loader, tmpdir=None, gpu_collect=Fal
 
 
 
-        breakpoint()
+        #breakpoint()
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
             #write resule to txt file
